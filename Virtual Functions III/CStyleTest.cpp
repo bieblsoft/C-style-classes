@@ -4,34 +4,6 @@ using namespace std;
 
 void main()
 {
-	// Anlegen eines Objektes der Klasse A
-	// Die beiden Schritte entsprechen dem normalen
-	// C++ Instanzierungsvorgang
-	// 1. Schritt: Definition ( Speicher wird zugewiesen )
-	A a;
-	// 2. Schritt: Initialisierung ( Objekt wird initialisiert )
-	A_CTOR(&a, 100);
-
-	// Referenz auf Objekt der Klasse A
-	const A& ra = a;
-
-	// Neu: Aufruf der virtuellen Funktionen
-	A* pA = &a;
-
-	virtual_F1( pA );
-	virtual_F2( pA );
-
-	// Daten abrufen
-	cout << "Inhalt von a: " << getA ( &ra ) << endl;
-
-	cout << "Funktion getA wird insgesamt 4x aufgerufen" << endl;
-	getA ( &ra );
-	getA ( &ra );
-	getA ( &ra );
-
-	// Funktionszähler beauskunften ( Anzahl der Aufrufe von getA )
-	cout << "Anzahl Funktionsaufrufe: " << getCounter ( &ra ) << endl;
-
 	// Instanzierung eines Objektes der von A abstammenden Klasse B
 	B b;
 	B_CTOR(&b, 2, 5);
@@ -59,5 +31,9 @@ void main()
 	// Funktionszähler beauskunften ( Anzahl der Aufrufe von getA )
 	cout << "Anzahl Funktionsaufrufe in b: " << getCounter ( &rb ) << endl;
 
+	// Aufruf des virtuellen Destruktors des Objektes b mit einem Pointer der Klasse a
+	// Wäre dies nicht gewährleistet, entstünde eine Speicherlücke, da zwar das Objekt a zerstört würde, 
+	// nicht aber das umgebende Objekt der Klasse b !
+	A_Destructor(pB);
 }
 
