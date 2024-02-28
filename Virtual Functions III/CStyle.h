@@ -4,18 +4,6 @@
 	Realisierung einer C++ Klasse inclusive 
 	Membermethoden in C
 
-	Die Zugehörigkeit der Methoden zur Klasse wird durch 
-	den this-Zeiger dokumentiert, der in C++ implizit als erstes
-	Argument an eine Methode übergeben wird.
-	Da der this-Zeiger nicht verändert werden darf, wird er const
-	vom Datentyp A deklariert.
-
-	Das C Äquivalent einer C++ Klasse ist ein struct.
-	Ein struct verfügt aber weder über Methoden noch über Konstruktoren
-	oder Destruktoren.
-	Daher können diese nicht als Bestandteil des structs, sondern nur extern 
-	deklariert werden.
-
 	3. Teil: Virtuelle Methoden in C
 */
 #include <iostream>
@@ -32,28 +20,14 @@ struct vtable
 	// mit typedef wird T_pFn defieniert als 
 	// Funktionspointer void (* T_pFn) (void)
 	typedef void (* T_pFn) ( const A* const _this );
-	// Deklaration eines Funktionsarrays für drei
-	// virtuelle Funktionen - F1, F2, und der virtuelle Destruktor !
+	// Deklaration eines Funktionspointer arrays für drei
+	// virtuelle Funktionen - F1, F2, und neu: der virtuelle Destruktor !
 	T_pFn fnArr[3];
 };
 
 // Implementierung der A Klasse in C Syntax
 struct A
 {
-	/*
-	// Implementierung der virtuellen Sprungtabelle (vTable)
-	// als Bestandteil der Klase A
-	struct vtable
-	{
-		// mit typedef wird T_pFn defieniert als 
-		// Funktionspointer void (* T_pFn) (void)
-		typedef void (* T_pFn) ( const A* const _this );
-		// Deklaration eines Funktionsarrays für zwei
-		// virtuelle Funktionen
-		T_pFn fnArr[3];
-	};
-	*/
-
 	const vtable* pVTable;
 	int a;
 	int counter;
@@ -90,12 +64,6 @@ void A_CTOR(A* const _this, int a)
 	// Deklaration einer virtuellen Sprungtabelle
 	// und Initialisierung mit den Adressen der
 	// virtuellen Funktionen F1 und F2
-
-	// wenn vtable als innere struct von A
-	// deklariert wird:
-	// static const A::vtable aVTable = { &A_F1, &A_F2};
-
-	// sonst:
 	static const vtable aVTable = { &A_F1, &A_F2 };
 
 	// Zuweisung der vtable an das Objekt
@@ -130,8 +98,12 @@ int getCounter(const A* const _this)
 struct B
 {
 	// Wie bei der C++ Instanzierung enthält das B-Objekt
-	// ein A-Objekt
-	A Objekt_A;
+	// ein A-Objekt. Hier als pointer auf das Objekt im Heap.
+	// wenn dieses Objekt mittels pointer auf A zerstört würde, ohne dass nachfolgend der Destuktor von B 
+	// ausgeführt wird, könnte immer noch über diesen Zeiger auf den Speicherort zugegriffen werden,
+	// obwohl das A-Objekt dort schon gar nicht mehr existiert. 
+	// Schlimmer noch: dies führt nicht zu einer Exception und das Programm stürzt auch nicht ab !
+	A* pObjekt_A;
 	int b;
 };
 
@@ -149,7 +121,7 @@ void A_Destructor(A* const _this)
 	// Allerdings haben wir hier virtualität vorliegen, es soll also ein Objekt der Klasse b 
 	// mit einem Basisklassen-Zeiger zerstört werden.
 	// Daher wird der Destruktor-Aufruf über die Virtuelle Sprungtabelle umgeleitet:
-	_this->pVTable->fnArr[0](_this);
+	_this->pVTable->fnArr[0]( _this);
 	// Dies erledigt auch mal wieder der C++ Compiler für uns
 };
 
@@ -170,30 +142,13 @@ void B_F2(const B* const _this)
 void B_Destructor(B* const _this)
 {
 	cout << "Aufruf des Destruktors der abgeleiteten Klasse" << endl;
+	// ohne virtuellen Destruktor würde der pointer immer noch auf das jetzt zerstörte Objekt zeigen !
+	(A*)_this->pObjekt_A = nullptr;
 };
 
 // Hier: Konstruktor
 void B_CTOR(B* const _this, int a, int b)
 {
-	// Deklaration einer virtuellen Sprungtabelle
-	// und Initialisierung mit den Adressen der
-	// virtuellen Funktionen F1 und F2
-	// Für die Übergabe eines this-Zeigers des B-Objektes
-	// muss ein Typecast für den Funktionstyp vorgenommen werden:
-
-	// wenn vtable als innere struct von A
-	// deklariert wird:
-	// static const A::vtable bVTable = { 
-	//	(A::vtable::T_pFn) (&B_F1), 
-	//	(A::vtable::T_pFn) (&B_F2) };
-	// sonst:
-	//static const vtable bVTable = { 
-	//	(vtable::T_pFn) (&B_F1), 
-	//	(vtable::T_pFn) (&B_F2) };
-
-	// Das funktioniert so nur mit einem C++/C Compiler; wenn man einen
-	// alten pure C Compiler hat, kennt der natürlich keine Namespaces und kann mit dem
-	// scope resolution operator nichts anfangen ! Daher:
 	typedef void (*T_pFn) (const A* const _this);
 	static const vtable bVTable =
 	{
@@ -202,19 +157,21 @@ void B_CTOR(B* const _this, int a, int b)
 		(T_pFn)(&B_F2)
 	};
 
+	// Instanzierung des A-Objektes im Heap
+	//_this->pObjekt_A = new A(); 
+	// oder C-Sprech: 
+	_this->pObjekt_A = (A*) malloc( sizeof(A) );
 	// Benutzung des Konstruktors der Klasse A 
 	// zur Initialisierung der Basisklasse
-	A_CTOR((A*)_this, a);
+	A_CTOR((A*)_this->pObjekt_A, a);
 
 	// Zuweisung der vtable an das Objekt
 	((A*)_this)->pVTable = &bVTable;
 
-	_this->Objekt_A.a = a;
 	_this->b = b;
-	_this->Objekt_A.counter = 0;
 };
 
-// Methode setA
+// Methode setB
 void setB(B* const _this, int b)
 {
 	_this->b = b;
@@ -229,9 +186,8 @@ int getB(const B* const _this)
 	return _this->b;
 };
 
-// Überschriebene Methode
 // Methode getCounter
 int getCounter(const B* const _this)
 {
-	return _this->Objekt_A.counter;
+	return _this->pObjekt_A->counter;
 };
